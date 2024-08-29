@@ -4,6 +4,7 @@ import {Router} from 'express';
 import {login, logout, signUp} from '../controllers/auth.controller.js';
 import {User} from '../models/user.model.js';
 import {generateTokenAndSetCookie} from '../utils/generateTokenAndSetCookie.js';
+import {sendVerificationEmail} from '../mailtrap/emails.js';
 
 const router = Router();
 
@@ -37,8 +38,10 @@ router.post('/signup', async (req, res) => {
     await user.save();
 
     //jwt
-
     generateTokenAndSetCookie(res, user._id);
+
+    //sending verification email
+    await sendVerificationEmail(user.email, verificationToken);
 
     res.status(201).json({
       msg: 'User created succefully',
