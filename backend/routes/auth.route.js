@@ -7,6 +7,7 @@ import { User } from '../models/user.model.js'
 import { generateTokenAndSetCookie } from '../utils/generateTokenAndSetCookie.js'
 import {
   sendForgotPasswordResetEmail,
+  sendResetSuccessEmail,
   sendVerificationEmail,
   sendWelcomeEmail
 } from '../mailtrap/emails.js'
@@ -160,7 +161,7 @@ router.post('/forgot-password', async (req, res) => {
     //send ForgotPasswordEmail
     await sendForgotPasswordResetEmail(
       user.email,
-      `${process.env.CLIENT_URL}/reset-password/${resetToken}`
+      `${process.env.CLIENT_URL}/api/auth/reset-password/${resetToken}`
     )
 
     res.status(200).json({
@@ -170,6 +171,41 @@ router.post('/forgot-password', async (req, res) => {
   } catch (error) {
     console.log('Error in forgotPassword', error)
     res.status(400), json({ success: false, message: error.message })
+  }
+})
+
+router.post('/reset-password/:token', async (req, res) => {
+  try {
+    const { token } = req.params
+    const { password } = req.body
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpireAt: { $gt: Date.now() } //to verify the token has not expired
+    })
+    if (!user)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid or Token Expired' })
+
+    //if token is found and not expired
+    //update password
+    const hashPassword = await bcryptjs.hash(password, 10)
+
+    user.password = hashPassword
+    user.resetPasswordToken = undefined
+    user.resetPasswordExpireAt = undefined
+
+    await user.save()
+
+    await sendResetSuccessEmail(user.email, user.name)
+
+    res
+      .status(200)
+      .json({ success: true, message: 'Password rest successfully' })
+  } catch (error) {
+    console.log('Error in  resetPassword', error)
+    res.status(400).json({ success: false, message: error.message })
   }
 })
 export default router
