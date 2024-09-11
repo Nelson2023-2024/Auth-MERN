@@ -1,10 +1,15 @@
 import bcryptjs from 'bcryptjs'
+import crypto from 'crypto'
 
 import { Router } from 'express'
 import { login, logout, signUp } from '../controllers/auth.controller.js'
 import { User } from '../models/user.model.js'
 import { generateTokenAndSetCookie } from '../utils/generateTokenAndSetCookie.js'
-import { sendVerificationEmail, sendWelcomeEmail } from '../mailtrap/emails.js'
+import {
+  sendForgotPasswordResetEmail,
+  sendVerificationEmail,
+  sendWelcomeEmail
+} from '../mailtrap/emails.js'
 
 const router = Router()
 
@@ -136,4 +141,35 @@ router.post('/logout', (req, res) => {
   res.status(200).json({ success: true, message: 'Logged out successfully' })
 })
 
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body
+  try {
+    const user = await User.findOne({ email })
+    if (!user)
+      return res.status(404).json({ success: false, message: 'User not found' })
+
+    //Generate reset token
+    const resetToken = crypto.randomBytes(20).toString('hex')
+    const resetTokenExpiresAt = Date.now() + 1 * 60 * 60 * 1000 ///1 hr
+
+    user.resetPasswordToken = resetToken
+    user.resetPasswordExpireAt = resetTokenExpiresAt
+
+    user.save()
+
+    //send ForgotPasswordEmail
+    await sendForgotPasswordResetEmail(
+      user.email,
+      `${process.env.CLIENT_URL}/reset-password/${resetToken}`
+    )
+
+    res.status(200).json({
+      success: true,
+      message: 'Password rest link sent to your email'
+    })
+  } catch (error) {
+    console.log('Error in forgotPassword', error)
+    res.status(400), json({ success: false, message: error.message })
+  }
+})
 export default router
