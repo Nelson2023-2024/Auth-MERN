@@ -92,8 +92,43 @@ router.post('/verify-email', async (req, res) => {
   }
 })
 
-router.post('/login', (req, res) => {
-  res.send('login route')
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body
+  try {
+    const user = await User.findOne({ email })
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: 'Email does nit exist' })
+
+    //validateing password
+    const validatePassword = await bcryptjs.compare(password, user.password)
+
+    if (!validatePassword)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Password did not match' })
+
+    //generate jwt
+    generateTokenAndSetCookie(res, user.id)
+
+    //update login history
+    user.lastLogin = new Date() //now
+
+    await user.save()
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged in successfully',
+      user: {
+        ...user._doc,
+        password: undefined
+      }
+    })
+  } catch (error) {
+    console.log('error in login', error)
+    res.status(400).json({ success: false, message: error.message })
+  }
 })
 
 router.post('/logout', (req, res) => {
