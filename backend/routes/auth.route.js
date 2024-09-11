@@ -97,7 +97,8 @@ router.post('/login', (req, res) => {
 })
 
 router.post('/logout', (req, res) => {
-  res.send('logout route')
+  res.clearCookie('token')
+  res.status(200).json({ success: true, message: 'Logged out successfully' })
 })
 
 export default router
