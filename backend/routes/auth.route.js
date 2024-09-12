@@ -1,5 +1,6 @@
 import bcryptjs from 'bcryptjs'
 import crypto from 'crypto'
+import jwt from 'jsonwebtoken'
 
 import { Router } from 'express'
 import { login, logout, signUp } from '../controllers/auth.controller.js'
@@ -208,4 +209,41 @@ router.post('/reset-password/:token', async (req, res) => {
     res.status(400).json({ success: false, message: error.message })
   }
 })
+
+router.get(
+  '/check-auth',
+  (req, res, next) => {
+    const token = req.cookies.token
+    if (!token)
+      res
+        .status(401)
+        .json({ success: false, message: 'Unauthorized no token provided' })
+    try {
+      const decode = jwt.verify(token, process.env.JWT_SECRET)
+      if (!decode)
+        return res
+          .status(401)
+          .json({ success: false, message: 'Unauthorized - Invalid token' })
+      req.userid = decode.userid
+      console.log('req.userid: ', req.userid)
+      next()
+    } catch (error) {
+      console.log('Error in verifyToken', error)
+      return res.status(500).json({ success: false, message: 'Server Error' })
+    }
+  },
+  async (req, res) => {
+    try {
+      const user = await User.findById(req.userid).select('-password')
+      if (!user)
+        return res
+          .status(404)
+          .json({ success: false, message: 'User not found' })
+      res.status(200).json({ success: true, user })
+    } catch (error) {
+      console.log('Error in checkAuth', error)
+      res.status(400).json({ success: false, message: error.message })
+    }
+  }
+)
 export default router
